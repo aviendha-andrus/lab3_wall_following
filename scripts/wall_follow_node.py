@@ -32,10 +32,13 @@ class WallFollow(Node):
         # create publisher
         self.publisher_ = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
 
-        # TODO: set PID gains
-        self.kp = self.declare_parameter('P', 2.0).get_parameter_value().double_value
-        self.kd = self.declare_parameter('D', 2.0).get_parameter_value().double_value
-        self.ki = self.declare_parameter('I', 2.0).get_parameter_value().double_value
+        # # TODO: set PID gains
+        # self.kp = self.declare_parameter('P', 2.0).get_parameter_value().double_value
+        # self.kd = self.declare_parameter('D', 2.0).get_parameter_value().double_value
+        # self.ki = self.declare_parameter('I', 2.0).get_parameter_value().double_value
+        self.kp = 1.0
+        self.kd = .01
+        self.ki = .01
 
         # TODO: store history
         self.integral = 0.
@@ -61,13 +64,17 @@ class WallFollow(Node):
             range: range measurement in meters at the given angle
 
         """
-        # check within range? 
+        # check within range? IndexError: array index out of range
+        # to avoid array index out of range error subtract ang_min from angle 
+        # TO-DO document explination
         
         ranges = range_data.ranges      # get range array 
-        ang_inc = np.degrees(range_data.angle_increment)    # get angle increment
+        ang_min = range_data.angle_min  # get angle min to correct index value
+        ang_inc = np.degrees(range_data.angle_increment)    # get angle increment & cast to degrees
 
-        # find index that corresponds to array angle (ang_inc already in radians)
-        index = int(angle/ang_inc)   # is this the right way to get the index
+        # find index that corresponds to array angle
+
+        index = int(angle - ang_min/ang_inc)   
         result = ranges[index] # the distance is the result 
 
         # if nan or inf don't return (error message?)
@@ -75,6 +82,7 @@ class WallFollow(Node):
             return result
         else:
             return None
+
 
     # implements follow left algorithm 
     def get_error(self, range_data, dist):
@@ -89,26 +97,25 @@ class WallFollow(Node):
             error: calculated error
         """
 
-                # points a and b
+        # positive error - too far from left wall, turn left (neg angle)
+        # negative error - too close to left wall, turn right (pos angle)
+
+        # points a and b
         # a : 0 < theta < 70 
         # b : 270 (90 degrees but to the left)
 
+        # if statement might be needed if a / b don't return anything 
         theta = 30
-        b = self.get_range(range_data, 270)
-        a = self.get_range(range_data, 270 - theta)
+        lookahead = 0.7 # Lookahead distance (car length)
+        b = self.get_range(range_data, -90) # 90 directly to the wall 
+        a = self.get_range(range_data, -90 + theta)
         
-        alpha = np.atan((a* np.cos(theta) - b)/ (a * np.sin(theta)))
+        alpha = np.arctan((a* np.cos(theta) - b)/ (a * np.sin(theta)))
+        Dt = b * np.cos(alpha) # current position        
+        DtPlus = Dt + lookahead * np.sin(alpha) # projection 
 
-        Dt = b * np.cos(alpha) # current position
-
-        look = 0.7 # Lookahead distance (car length)
-        DtPlus = Dt + look * np.sin(alpha) # projection 
-
-        # self error dist - act distance 
-        # error = dist - actualdist plus one 
-        # return error 
-
-        return 0.0
+        error = dist - DtPlus
+        return error 
 
     def pid_control(self, error, velocity):
         """
@@ -122,15 +129,9 @@ class WallFollow(Node):
             None
         """
 
-        global kp
-        global ki
-        global kd
-        global integral 
-        global deriv
-
+        # get time and get change in time 
         curr_time = self.get_clock().now()
-        delta_t = (curr_time - self.prev_time) # to seconds + to nanoseconds
-
+        delta_t = (curr_time - self.prev_time).nanoseconds * 1e-9 
 
         # Update the PID parameters
         self.integral += error * delta_t
@@ -139,10 +140,24 @@ class WallFollow(Node):
         # Calculate the angle
         angle = self.kp * error + self.ki * self.integral + self.kd * derivative
         
-        angle = 0.0
+        # clamp the angle (avoid sharp turns)
         
-        drive_msg = AckermannDriveStamped(angle, )
-        # TODO: fill in drive message and publish
+        # update 
+        self.prev_error = error
+        self.prev_time = curr_time
+
+        # Log the values for debugging
+        self.get_logger().info(f"Error: {error:.2f}, Angle: {angle:.2f}, Velocity: {velocity:.2f}")
+
+        # publish drive message 
+        drive_msg = AckermannDriveStamped()
+        drive_msg.header.stamp = self.get_clock().now().to_msg()
+        drive_msg.drive.steering_angle = -angle # negative? 
+        drive_msg.drive.speed = velocity 
+        self.publisher_.publish(drive_msg) 
+
+
+
 
     def scan_callback(self, msg):
         """
@@ -150,19 +165,23 @@ class WallFollow(Node):
 
         Args:
             msg: Incoming LaserScan message
-
-
         Returns:
             None
         """
         
-        
         # calculate error 
         # publish drive error 
 
-        # self.get_error(error, velocity) ?
-        error = 0.0 # TODO: replace with error calculated by get_error()
-        velocity = 0.0 # TODO: calculate desired car velocity based on error
+        # error = 0.0 # TODO: replace with error calculated by get_error()
+        distance = .85
+        error = self.get_error(msg, distance) # 1 meter from left wall 
+
+        # calculate velocity 
+        # 0-10 1.5 m/s
+        # 10-20 1.0 m/s
+        # 0.5 m/s 
+
+        velocity = 0.3 # TODO: calculate desired car velocity based on error
         self.pid_control(error, velocity) # TODO: actuate the car with PID
 
 
