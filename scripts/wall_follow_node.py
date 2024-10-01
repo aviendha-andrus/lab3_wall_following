@@ -30,19 +30,18 @@ class WallFollow(Node):
         self.publisher_ = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
 
         # # TODO: set PID gains
-        self.kp = self.declare_parameter('kp', 2.0).get_parameter_value().double_value
-        self.kd = self.declare_parameter('kd', 2.0).get_parameter_value().double_value
-        self.ki = self.declare_parameter('ki', 2.0).get_parameter_value().double_value
-        self.speed = self.declare_parameter('speed', 2.0).get_parameter_value().double_value
+        # self.kp = self.declare_parameter('kp', 0.0).get_parameter_value().double_value
+        # self.kd = self.declare_parameter('kd', 0.0).get_parameter_value().double_value
+        # self.ki = self.declare_parameter('ki', 0.0).get_parameter_value().double_value
         # self.kp = 1.0
         # self.kd = .01
         # self.ki = .01
         # self.kp = -3
         # self.kd = 1
         # self.ki = .01
-        # self.kp = -15
-        # self.kd = 5
-        # self.ki = 0
+        self.kp = -5
+        self.kd = 0
+        self.ki = 0
 
         # TODO: store history
         self.integral = 0.
@@ -53,7 +52,7 @@ class WallFollow(Node):
         self.prev_time = self.get_clock().now()
 
         # TODO: store any necessary values you think you'll need
-        self.speed = self.declare_parameter('speed', 2.0).get_parameter_value().double_value
+        self.speed = self.declare_parameter('speed', 0.8).get_parameter_value().double_value
 
     def get_range(self, range_data, angle):
         """
@@ -106,17 +105,17 @@ class WallFollow(Node):
         # why does 90 degree work 
         # arctan2 + , (4 quadrents)
     
-        theta = 30
-        lookahead = 0.7 # Lookahead distance (car length)
+        theta = 56
+        lookahead = 5
         b = self.get_range(range_data, 90) # 90 directly to the wall 
         a = self.get_range(range_data, 90 - theta)
         
-        theta = np.radians(theta) # to radians chagned 
+        theta = np.radians(theta) # to radians changed
         alpha = np.arctan((a* np.cos(theta) - b)/ (a * np.sin(theta)))
-        Dt = b * np.cos(alpha) # current position        
-        DtPlus = Dt + lookahead * np.sin(alpha) # projection 
+        cur_pos = b * np.cos(alpha) # current position        
+        projection = cur_pos + lookahead * np.sin(alpha) # projection 
 
-        error = dist - DtPlus   #OUR dist is being passed in 
+        error = dist - projection   # OUR dist is being passed in 
         return error 
 
 
@@ -138,7 +137,7 @@ class WallFollow(Node):
 
         # get time and get change in time 
         curr_time = self.get_clock().now()
-        delta_t = (curr_time - self.prev_time).nanoseconds * 1e-9 
+        delta_t = (curr_time - self.prev_time).nanoseconds * 1e9 
 
         # Update the PID parameters
         self.integral += error * delta_t
@@ -183,7 +182,7 @@ class WallFollow(Node):
         # publish drive error 
 
         # error = 0.0 # TODO: replace with error calculated by get_error()
-        distance = .55
+        distance = 1
         error = self.get_error(msg, distance) # 1 meter from left wall 
 
         # calculate velocity 
