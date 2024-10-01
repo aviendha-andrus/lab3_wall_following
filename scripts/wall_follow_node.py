@@ -30,18 +30,13 @@ class WallFollow(Node):
         self.publisher_ = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
 
         # # TODO: set PID gains
-        # self.kp = self.declare_parameter('kp', 0.0).get_parameter_value().double_value
-        # self.kd = self.declare_parameter('kd', 0.0).get_parameter_value().double_value
-        # self.ki = self.declare_parameter('ki', 0.0).get_parameter_value().double_value
-        # self.kp = 1.0
-        # self.kd = .01
-        # self.ki = .01
-        # self.kp = -3
-        # self.kd = 1
-        # self.ki = .01
-        self.kp = -5
-        self.kd = 0
-        self.ki = 0
+        self.kp = self.declare_parameter('kp', 0.0).get_parameter_value().double_value
+        self.kd = self.declare_parameter('kd', 0.0).get_parameter_value().double_value
+        self.ki = self.declare_parameter('ki', 0.0).get_parameter_value().double_value
+
+        # self.kp = -7
+        # self.kd = 0
+        # self.ki = 0
 
         # TODO: store history
         self.integral = 0.
@@ -51,8 +46,8 @@ class WallFollow(Node):
         # previous time set - need to_msg? 
         self.prev_time = self.get_clock().now()
 
-        # TODO: store any necessary values you think you'll need
-        self.speed = self.declare_parameter('speed', 0.8).get_parameter_value().double_value
+        # # TODO: store any necessary values you think you'll need
+        self.speed = self.declare_parameter('speed', 0.0).get_parameter_value().double_value
 
     def get_range(self, range_data, angle):
         """
@@ -68,7 +63,6 @@ class WallFollow(Node):
         """
         # check within range? IndexError: array index out of range
         # to avoid array index out of range error subtract ang_min from angle 
-        # TO-DO document explination
         
         ranges = range_data.ranges
         angle_incr = np.degrees(range_data.angle_increment)
@@ -95,18 +89,17 @@ class WallFollow(Node):
             error: calculated error
         """
 
-        # positive error - too far from left wall, turn left (neg angle)
-        # negative error - too close to left wall, turn right (pos angle)
+        # neg angle - right (positive error?)
+        # pos angle - left (negitive error?)
 
         # points a and b
         # a : 0 < theta < 70 
-        # b : 270 (90 degrees but to the left)
+        # b : 90 degrees
 
-        # why does 90 degree work 
         # arctan2 + , (4 quadrents)
     
-        theta = 56
-        lookahead = 5
+        theta = 57
+        lookahead = 2
         b = self.get_range(range_data, 90) # 90 directly to the wall 
         a = self.get_range(range_data, 90 - theta)
         
@@ -117,7 +110,6 @@ class WallFollow(Node):
 
         error = dist - projection   # OUR dist is being passed in 
         return error 
-
 
     def pid_control(self, error, velocity):
         """
@@ -131,10 +123,6 @@ class WallFollow(Node):
             None
         """
 
-        # angle to radians 
-        # pemdas :c
-        # clamp 
-
         # get time and get change in time 
         curr_time = self.get_clock().now()
         delta_t = (curr_time - self.prev_time).nanoseconds * 1e9 
@@ -147,16 +135,24 @@ class WallFollow(Node):
         angle = np.radians(self.kp * error + self.ki * self.integral + self.kd * derivative)
         
         # # clamp the angle (avoid sharp turns)
-        # if angle > 20:
-        #     angle = 20
-        # elif angle < -20:  
-        #     angle = -20
+        if angle > 20:
+            angle = 20
+        elif angle < -20:  
+            angle = -20
+
+        # TO-DO 
+        # # calculate velocity (based off angle)
+        # if angle >= 0 and angle <= 10:
+        #     self.speed = 1.5
+        # elif angle > 10 and angle <= 20:
+        #     self.speed = 1.0
+        # else:
+        #     self.speed = 0.5
             
         # update 
         self.prev_error = error
         self.prev_time = curr_time
 
-        # yoinked 
         # Log the values for debugging
         self.get_logger().info(f"Error: {error:.2f}, Angle: {angle:.2f}, Velocity: {velocity:.2f}")
 
@@ -177,23 +173,17 @@ class WallFollow(Node):
         Returns:
             None
         """
-        
-        # calculate error 
-        # publish drive error 
-
         # error = 0.0 # TODO: replace with error calculated by get_error()
-        distance = 1
+        distance = .9
         error = self.get_error(msg, distance) # 1 meter from left wall 
 
-        # calculate velocity 
-        # 0-10 1.5 m/s
-        # 10-20 1.0 m/s
-        # 0.5 m/s 
+        # TODO: calculate desired car velocity based on error
+        # calculate velocity (based off angle)
 
-        velocity = 0.8 # TODO: calculate desired car velocity based on error
+        velocity = self.speed 
+
         if error is not None: 
             self.pid_control(error, velocity) # TODO: actuate the car with PID
-
 
 def main(args=None):
     rclpy.init(args=args)
@@ -210,3 +200,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
