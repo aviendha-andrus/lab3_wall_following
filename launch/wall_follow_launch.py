@@ -9,14 +9,17 @@ def generate_launch_description():
 	kd_arg = DeclareLaunchArgument('kd', default_value='0.0')
 	ki_arg = DeclareLaunchArgument('ki', default_value='0.0')
 	speed_arg = DeclareLaunchArgument('speed', default_value='0.0')
+	dist_arg = DeclareLaunchArgument('dist', default_value='0.0')
+	# theta_arg = DeclareLaunchArgument('theta', default_value='0.0')
+	# look_arg = DeclareLaunchArgument('look', default_value='0.0')
 
 	kp = LaunchConfiguration('kp')
 	kd = LaunchConfiguration('kd')
 	ki = LaunchConfiguration('ki')
 	speed = LaunchConfiguration('speed')
-
-	# package_name =[student,TextSubstitution(text='_safety_node')]
-	# executable_name = [student,TextSubstitution(text='_safety_node.py')]
+	dist = LaunchConfiguration('dist')
+	# theta = LaunchConfiguration('speed')
+	# look = LaunchConfiguration('dist')
 
 	wall_node = Node(
 		package='wall_follow',
@@ -29,6 +32,9 @@ def generate_launch_description():
 			{'kd': kd},
 			{'ki': ki},
 			{'speed': speed},
+			{'dist': dist},
+			# {'theta': theta},
+			# {'look': look},
 		]
     )
 
@@ -37,7 +43,10 @@ def generate_launch_description():
 		kp_arg,
 		kd_arg,
 		ki_arg,
-		speed_arg
+		speed_arg, 
+		dist_arg,
+		# theta_arg, 
+		# look_arg,
 	])
 
 

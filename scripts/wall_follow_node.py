@@ -48,7 +48,9 @@ class WallFollow(Node):
 
         # # TODO: store any necessary values you think you'll need
         self.speed = self.declare_parameter('speed', 0.0).get_parameter_value().double_value
-
+        self.dist = self.declare_parameter('dist', 0.0).get_parameter_value().double_value
+        self.theta = self.declare_parameter('theta', 0.0).get_parameter_value().double_value
+        # self.look = self.declare_parameter('look', 0.0).get_parameter_value().double_value
     def get_range(self, range_data, angle):
         """
         Simple helper to return the corresponding range measurement at a given angle. Make sure you take care of NaNs and infs.
@@ -174,7 +176,7 @@ class WallFollow(Node):
             None
         """
         # error = 0.0 # TODO: replace with error calculated by get_error()
-        distance = .9
+        distance = self.dist
         error = self.get_error(msg, distance) # 1 meter from left wall 
 
         # TODO: calculate desired car velocity based on error
